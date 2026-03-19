@@ -24,5 +24,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'maven'
+
+      - name: Make Maven Wrapper executable
+        run: chmod +x ./mvnw
+
       - name: Build & Test (sélectif ou global)
+        shell: bash
         run: ./mvnw -B -T1C -DskipTests=false clean verify
