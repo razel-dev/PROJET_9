@@ -1,0 +1,29 @@
+# VCS/IDE
+.git
+.gitignore
+.idea
+.vscode
+*.iml
+
+# Build/outputs
+target
+out
+build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env & Docker local-only
+platform/.env
+.env.*
+platform/compose/docker-compose.yml
+platform/compose/
+platform/observability/
+platform/keycloak/
+platform/scripts/
+
+# Logs & temp
+*.log
+logs
+tmp

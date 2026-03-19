@@ -1,0 +1,28 @@
+name: CI Mono-Repo
+
+on:
+  pull_request:
+    paths:
+      - 'api-gateway/**'
+      - 'patient-service/**'
+      - 'history-service/**'
+      - 'assessment-service/**'
+      - 'libs/**'
+      - 'pom.xml'
+      - '.github/workflows/**'
+  push:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Temurin 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
+      - name: Build & Test (sélectif ou global)
+        run: ./mvnw -B -T1C -DskipTests=false clean verify
