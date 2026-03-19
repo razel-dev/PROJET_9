@@ -14,8 +14,69 @@ on:
     branches: [ main ]
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.set-matrix.outputs.services }}
+      any: ${{ steps.set-matrix.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detecter les changements
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            api-gateway:
+              - 'api-gateway/**'
+            patient-service:
+              - 'patient-service/**'
+            history-service:
+              - 'history-service/**'
+            assessment-service:
+              - 'assessment-service/**'
+            libs:
+              - 'libs/**'
+            root:
+              - 'pom.xml'
+      - name: Préparer matrice
+        id: set-matrix
+        shell: bash
+        run: |
+          # Push sur main: on build tout
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo 'services=["api-gateway","patient-service","history-service","assessment-service"]' >> "$GITHUB_OUTPUT"
+            echo 'any=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=()
+          for svc in api-gateway patient-service history-service assessment-service; do
+            if [ "${{ steps.filter.outputs[svc] }}" = "true" ]; then
+              changed+=("\"$svc\"")
+            fi
+          done
+
+          if [ ${#changed[@]} -eq 0 ]; then
+            # Si libs ou pom racine changent, on reconstruit tout
+            if [ "${{ steps.filter.outputs.libs }}" = "true" ] || [ "${{ steps.filter.outputs.root }}" = "true" ]; then
+              echo 'services=["api-gateway","patient-service","history-service","assessment-service"]' >> "$GITHUB_OUTPUT"
+              echo 'any=true' >> "$GITHUB_OUTPUT"
+            else
+              echo 'services=[]' >> "$GITHUB_OUTPUT"
+              echo 'any=false' >> "$GITHUB_OUTPUT"
+            fi
+          else
+            printf 'services=[%s]\n' "$(IFS=,; echo "${changed[*]}")" >> "$GITHUB_OUTPUT"
+            echo 'any=true' >> "$GITHUB_OUTPUT"
+          fi
   build-test:
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.any == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.changes.outputs.services) }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Temurin 17
@@ -27,6 +88,9 @@ jobs:
 
       - name: Make Maven Wrapper executable
         run: chmod +x ./mvnw
-      - name: Build & Test (sélectif ou global)
+
+      - name: Build & Test (sélectif)
         shell: bash
-        run: ./mvnw -B -T1C -DskipTests=true -Dmaven.test.skip=true clean package
+        run: |
+          MOD="${{ matrix.service }}"
+          ./mvnw -B -T1C -DskipTests=true -Dmaven.test.skip=true -pl "$MOD" -am clean package
