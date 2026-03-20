@@ -50,11 +50,20 @@ jobs:
           fi
 
           changed=()
-          for svc in api-gateway patient-service history-service assessment-service; do
-            if [ "${{ steps.filter.outputs[svc] }}" = "true" ]; then
-              changed+=("\"$svc\"")
-            fi
-          done
+          # Remplacer l'indexation dynamique steps.filter.outputs[svc]
+          # par des vérifications explicites pour chaque service
+          if [ "${{ steps.filter.outputs.api-gateway }}" = "true" ]; then
+            changed+=("\"api-gateway\"")
+          fi
+          if [ "${{ steps.filter.outputs.patient-service }}" = "true" ]; then
+            changed+=("\"patient-service\"")
+          fi
+          if [ "${{ steps.filter.outputs.history-service }}" = "true" ]; then
+            changed+=("\"history-service\"")
+          fi
+          if [ "${{ steps.filter.outputs.assessment-service }}" = "true" ]; then
+            changed+=("\"assessment-service\"")
+          fi
 
           if [ ${#changed[@]} -eq 0 ]; then
             # Si libs ou pom racine changent, on reconstruit tout
