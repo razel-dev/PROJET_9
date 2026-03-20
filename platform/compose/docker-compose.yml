@@ -4,6 +4,7 @@ name: medilabo
 services:
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
+    profiles: ["auth"]
     command: ["start-dev", "--http-port=8080"]
     environment:
       KEYCLOAK_ADMIN: admin
@@ -12,28 +13,31 @@ services:
     ports:
       - "8081:8080"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/realms/master/.well-known/openid-configuration || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
       interval: 10s
-      timeout: 3s
-      retries: 15
+      timeout: 5s
+      retries: 60
+      start_period: 40s
     networks: ["backend"]
 
   assessment-service:
+    build:
+      context: ../../assessment-service
+      dockerfile: Dockerfile
     image: assessment-service:latest
     depends_on:
       keycloak:
-        condition: service_healthy
+        condition: service_started
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
-      ENVIRONMENT: ${ENVIRONMENT}
-      APP_VERSION: ${APP_VERSION}
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: ${JWKS_URI}
-    ports:
-      - "8080:8080"
-    networks:
-      - backend
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      APP_VERSION: ${APP_VERSION:-dev}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: ${JWKS_URI:-http://keycloak:8080/realms/medilabo/protocol/openid-connect/certs}
 
   api-gateway:
+    build:
+      context: ../../api-gateway
+      dockerfile: Dockerfile
     image: api-gateway:latest
     depends_on:
       assessment-service:
@@ -43,41 +47,41 @@ services:
       history-service:
         condition: service_started
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
-      ENVIRONMENT: ${ENVIRONMENT}
-      APP_VERSION: ${APP_VERSION}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      APP_VERSION: ${APP_VERSION:-dev}
     ports:
       - "8082:8080"
     networks:
       - backend
 
   patient-service:
+    build:
+      context: ../../patient-service
+      dockerfile: Dockerfile
     image: patient-service:latest
     depends_on:
       keycloak:
-        condition: service_healthy
+        condition: service_started
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
-      ENVIRONMENT: ${ENVIRONMENT}
-      APP_VERSION: ${APP_VERSION}
-    ports:
-      - "8083:8080"
-    networks:
-      - backend
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      APP_VERSION: ${APP_VERSION:-dev}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: ${JWKS_URI:-http://keycloak:8080/realms/medilabo/protocol/openid-connect/certs}
 
   history-service:
+    build:
+      context: ../../history-service
+      dockerfile: Dockerfile
     image: history-service:latest
     depends_on:
       keycloak:
-        condition: service_healthy
+        condition: service_started
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
-      ENVIRONMENT: ${ENVIRONMENT}
-      APP_VERSION: ${APP_VERSION}
-    ports:
-      - "8084:8080"
-    networks:
-      - backend
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      APP_VERSION: ${APP_VERSION:-dev}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: ${JWKS_URI:-http://keycloak:8080/realms/medilabo/protocol/openid-connect/certs}
 
   prometheus:
     image: prom/prometheus:v2.52.0

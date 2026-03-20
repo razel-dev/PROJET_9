@@ -31,3 +31,23 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+*.env
+*.env.local
+**/.env
+**/.env.*
+platform/compose/.env
+platform/compose/.env.*
+*.kdbx
+*.key
+*.pem
+*.crt
+*.p12
+*.jks
+
+### Logs / temporaires ###
+*.log
+**/*.log
+logs/
+tmp/

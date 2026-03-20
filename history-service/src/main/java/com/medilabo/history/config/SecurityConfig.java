@@ -1,5 +1,5 @@
+package com.medilabo.history.config;
 
-package com.medilabo.assessment.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

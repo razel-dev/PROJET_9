@@ -3,36 +3,36 @@
 .gitignore
 .gitattributes
 .idea
-.vscode
 *.iml
 *.ipr
 *.iws
+.vscode
 .nb-gradle
 .gradle
-
-# Builds/outputs
-target/
-build/
-out/
 
 # OS
 .DS_Store
 Thumbs.db
 
+# Builds locaux (ne pas tout envoyer)
+target/
+!target/*.jar
+
 # Maven/Gradle auxiliaires
 .mvn/
 **/.mvn/
 **/build/
+build/
 
 # Front éventuel
-node_modules/
-dist/
+node_modules
+dist
 
-# Environnements & secrets (ne jamais envoyer dans un build lancé depuis la racine)
+# Fichiers d'env et secrets (ne jamais envoyer dans le build)
 *.env
 *.env.local
-**/*.env
-**/*.env.local
+.env
+.env.local
 *.kdbx
 *.key
 *.pem
@@ -42,5 +42,5 @@ dist/
 
 # Logs / temporaires
 **/*.log
-logs/
+logs
 tmp/
