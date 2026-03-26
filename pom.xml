@@ -19,6 +19,8 @@
         <module>assessment-service</module>
         <module>libs/commons</module>
         <module>libs/clients</module>
+        <module>front-app</module>
+
     </modules>
     <properties>
         <java.version>17</java.version>
