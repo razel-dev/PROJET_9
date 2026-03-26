@@ -9,9 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import org.springframework.data.domain.PageRequest;
-import com.medilabo.libs.commons.paging.PageResponse;
-import com.medilabo.libs.commons.paging.Pages;
 
 @RestController
 @RequiredArgsConstructor
@@ -22,13 +19,9 @@ public class PatientController {
     private final PatientMapper mapper;
 
     @GetMapping
-    public PageResponse<PatientDto> list(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
-        var pg = service.findAll(PageRequest.of(page, size));
-        List<PatientDto> content = mapper.toDtos(pg.getContent());
-        return Pages.of(content, pg.getTotalElements(), page, size);
+    public List<PatientDto> list() {
+
+        return mapper.toDtos(service.findAll());
     }
 
     @GetMapping("/{id}")
@@ -45,6 +38,13 @@ public class PatientController {
     @PutMapping("/{id}")
     public PatientDto update(@PathVariable Long id, @Valid @RequestBody PatientDto payload) {
         return mapper.toDto(service.update(id, mapper.toEntity(payload)));
+    }
+
+    // PATCH: mise à jour partielle — n’écrase pas les autres champs
+    @PatchMapping("/{id}")
+    public PatientDto patch(@PathVariable Long id, @RequestBody PatientDto payload) {
+        // Mise à jour partielle: seuls les champs non nuls du DTO sont appliqués
+        return mapper.toDto(service.updatePartial(id, payload));
     }
 
     @DeleteMapping("/{id}")

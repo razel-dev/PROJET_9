@@ -1,4 +1,4 @@
-package com.medilabo.patient.dto;
+package com.medilabo.libs.client.patient.dto;
 
 import com.medilabo.libs.commons.validation.ValidPhone;
 import jakarta.validation.constraints.NotBlank;
@@ -18,11 +18,11 @@ public class PatientDto {
     private String prenom;
     @NotBlank
     private String nom;
-    @NotNull @Past
+    @NotNull
+    @Past
     private LocalDate dateDeNaissance;
     @NotNull
     private Gender genre;
     private String adressePostale;
-    @ValidPhone
-    private String numeroTelephone;
+    @ValidPhone private String numeroTelephone;
 }
