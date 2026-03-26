@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/web/thymeleaf/layout"
+      layout:decorate="~{layouts/main}">
+<head>
+    <title th:text="${patient.id} != null ? 'Modifier un patient' : 'Nouveau patient'">Form</title>
+</head>
+<body>
+<main layout:fragment="content">
+  <nav aria-label="Fil d'Ariane" class="mb-2">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a th:href="@{/patients}">Patients</a></li>
+      <li class="breadcrumb-item active" aria-current="page"
+          th:text="${patient.id} != null ? 'Modifier' : 'Nouveau'">Nouveau</li>
+    </ol>
+  </nav>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h4 mb-0" th:text="${patient.id} != null ? 'Modifier un patient' : 'Nouveau patient'">Form</h2>
+    <a class="btn btn-outline-secondary" th:href="@{/patients}">
+      <i class="bi bi-arrow-left me-1"></i>Retour
+    </a>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form id="patientForm" class="row g-3"
+            th:action="${patient.id} != null ? '/patients/' + ${patient.id} : '/patients'"
+            method="post" th:object="${patient}">
+        <div class="col-md-6">
+          <label class="form-label">Prénom*</label>
+          <input class="form-control" th:field="*{prenom}" required/>
+          <div class="invalid-feedback">Le prénom est requis.</div>
+          <div class="text-danger small" th:if="${#fields.hasErrors('prenom')}" th:errors="*{prenom}"></div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Nom*</label>
+          <input class="form-control" th:field="*{nom}" required/>
+          <div class="invalid-feedback">Le nom est requis.</div>
+          <div class="text-danger small" th:if="${#fields.hasErrors('nom')}" th:errors="*{nom}"></div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Date de naissance*</label>
+          <input type="date" class="form-control" th:field="*{dateDeNaissance}" required/>
+          <div class="invalid-feedback">La date de naissance est requise.</div>
+          <div class="text-danger small" th:if="${#fields.hasErrors('dateDeNaissance')}" th:errors="*{dateDeNaissance}"></div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Genre*</label>
+          <select class="form-select" th:field="*{genre}" required>
+            <option value="" disabled th:if="${patient.genre} == null">Choisir...</option>
+            <option th:each="g : ${T(com.medilabo.libs.commons.core.Gender).values()}"
+                    th:value="${g}"
+                    th:text="${g == T(com.medilabo.libs.commons.core.Gender).M ? 'M' 
+                              : (g == T(com.medilabo.libs.commons.core.Gender).F ? 'F' : 'Autre')}">
+            </option>
+          </select>
+          <div class="invalid-feedback">Le genre est requis.</div>
+          <div class="text-danger small" th:if="${#fields.hasErrors('genre')}" th:errors="*{genre}"></div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Téléphone</label>
+          <input class="form-control" th:field="*{numeroTelephone}" placeholder="+33 6 12 34 56 78"/>
+          <div class="text-danger small" th:if="${#fields.hasErrors('numeroTelephone')}" th:errors="*{numeroTelephone}"></div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Adresse</label>
+          <input class="form-control" th:field="*{adressePostale}" placeholder="12 rue ... 75000 Paris"/>
+        </div>
+
+        <div class="col-12 d-flex gap-2">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check2 me-1"></i>Enregistrer
+          </button>
+          <!-- envoie le même formulaire vers l’endpoint partiel -->
+          <button type="submit"
+                  class="btn btn-outline-secondary"
+                  th:if="${patient.id} != null"
+                  formmethod="post"
+                  th:formaction="@{'/patients/' + ${patient.id} + '/partial'}">
+            <i class="bi bi-arrow-repeat me-1"></i>Mettre à jour
+          </button>
+          <a class="btn btn-outline-secondary" th:href="@{/patients}">
+            <i class="bi bi-x-lg me-1"></i>Annuler
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+</main>
+</body>
+</html>
