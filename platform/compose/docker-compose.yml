@@ -1,17 +1,17 @@
-version: "3.9"
-
 name: medilabo
 services:
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
     profiles: ["auth"]
-    command: ["start-dev", "--http-port=8080"]
+    command: ["start-dev", "--http-port=8080", "--import-realm"]
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_METRICS_ENABLED: "true"
     ports:
-      - "8081:8080"
+      - "18080:8080"
+    volumes:
+      - ../keycloak/medilabo-realm.json:/opt/keycloak/data/import/medilabo-realm.json:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
       interval: 10s
@@ -19,41 +19,88 @@ services:
       retries: 60
       start_period: 40s
     networks: ["backend"]
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:6
+    # container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --eval 'db.adminCommand(\"ping\")' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: ["backend"]
 
   assessment-service:
     build:
       context: ../../assessment-service
       dockerfile: Dockerfile
     image: assessment-service:latest
-    depends_on:
-      keycloak:
-        condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
       ENVIRONMENT: ${ENVIRONMENT:-local}
       APP_VERSION: ${APP_VERSION:-dev}
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: ${JWKS_URI:-http://keycloak:8080/realms/medilabo/protocol/openid-connect/certs}
+    networks: ["backend"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
 
   api-gateway:
     build:
       context: ../../api-gateway
       dockerfile: Dockerfile
     image: api-gateway:latest
+    profiles: ["auth"]
     depends_on:
       assessment-service:
-        condition: service_started
+        condition: service_healthy
       patient-service:
-        condition: service_started
+        condition: service_healthy
       history-service:
-        condition: service_started
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
-      ENVIRONMENT: ${ENVIRONMENT:-local}
-      APP_VERSION: ${APP_VERSION:-dev}
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/medilabo
     ports:
-      - "8082:8080"
+      - "8080:8080"
     networks:
       - backend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  front-app:
+    build:
+      context: ../../front-app
+      dockerfile: Dockerfile
+    image: front-app:latest
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8082
+    ports:
+      - "8082:8082"
+    networks: ["backend"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8082/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
 
   patient-service:
     build:
@@ -61,13 +108,24 @@ services:
       dockerfile: Dockerfile
     image: patient-service:latest
     depends_on:
-      keycloak:
-        condition: service_started
+      mysql:
+        condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      SPRING_PROFILES_ACTIVE: docker
       ENVIRONMENT: ${ENVIRONMENT:-local}
       APP_VERSION: ${APP_VERSION:-dev}
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: ${JWKS_URI:-http://keycloak:8080/realms/medilabo/protocol/openid-connect/certs}
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/medilabo_patients?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+    networks: ["backend"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8084/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
 
   history-service:
     build:
@@ -75,13 +133,40 @@ services:
       dockerfile: Dockerfile
     image: history-service:latest
     depends_on:
-      keycloak:
-        condition: service_started
+      mongo:
+        condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
       ENVIRONMENT: ${ENVIRONMENT:-local}
       APP_VERSION: ${APP_VERSION:-dev}
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: ${JWKS_URI:-http://keycloak:8080/realms/medilabo/protocol/openid-connect/certs}
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/medilabo_history
+      SPRING_DATA_MONGODB_AUTO_INDEX_CREATION: "true"
+      SERVER_PORT: 8083
+    networks: ["backend"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.3
+    environment:
+      MYSQL_ROOT_PASSWORD: rootroot
+      MYSQL_DATABASE: medilabo_patients
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppass
+    command: ["--default-time-zone=+00:00", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -prootroot || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: ["backend"]
 
   prometheus:
     image: prom/prometheus:v2.52.0
@@ -90,24 +175,13 @@ services:
       - ../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "9090:9090"
-    depends_on: ["assessment-service"]
     networks:
       - backend
-
-  grafana:
-    image: grafana/grafana-oss:10.4.0
-    profiles: ["observability"]
     restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - ../observability/grafana/provisioning/:/etc/grafana/provisioning/
-    depends_on:
-      - prometheus
-    networks:
-      - backend
 
 networks:
   backend: {}
+
+volumes:
+  mongo-data: {}
+  mysql-data: {}
