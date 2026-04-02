@@ -112,3 +112,10 @@ jobs:
         with:
           name: maven-logs
           path: build-*.log
+      - name: Publier logs Maven si échec (par module)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-logs-${{ matrix.service }}
+          path: build-*.log
+          if-no-files-found: ignore
