@@ -21,6 +21,13 @@ jobs:
       any: ${{ steps.set-matrix.outputs.any }}
     steps:
       - uses: actions/checkout@v4
+      - name: Installer jq
+        shell: bash
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y jq
+          fi
       - name: Détecter les changements
         id: filter
         uses: dorny/paths-filter@v3
@@ -42,14 +49,17 @@ jobs:
         id: set-matrix
         shell: bash
         run: |
+          # Normalise la liste complète des services en JSON compact
+          ALL_JSON=$(jq -c '.' <<< '${{ env.SERVICES }}')
+
           # Push sur main: on build tout
           if [ "${{ github.event_name }}" = "push" ]; then
-            echo "services=${{ env.SERVICES }}" >> "$GITHUB_OUTPUT"
+            echo "services=$ALL_JSON" >> "$GITHUB_OUTPUT"
             echo 'any=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Construire en JSON robuste avec jq
+          # Construire en JSON robuste avec jq (sélection des services modifiés)
           changed_json=$(jq -cn \
             --arg ag "${{ steps.filter.outputs.api-gateway }}" \
             --arg ps "${{ steps.filter.outputs.patient-service }}" \
@@ -64,7 +74,7 @@ jobs:
           # Si aucun service ciblé mais libs/root ont changé, tout builder
           if [ "$(jq -r 'length' <<<"$changed_json")" -eq 0 ]; then
             if [ "${{ steps.filter.outputs.libs }}" = "true" ] || [ "${{ steps.filter.outputs.root }}" = "true" ]; then
-              echo "services=${{ env.SERVICES }}" >> "$GITHUB_OUTPUT"
+              echo "services=$ALL_JSON" >> "$GITHUB_OUTPUT"
               echo 'any=true' >> "$GITHUB_OUTPUT"
             else
               echo 'services=[]' >> "$GITHUB_OUTPUT"
