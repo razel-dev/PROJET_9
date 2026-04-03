@@ -1,6 +1,6 @@
 name: CI Mono-Repo
 env:
-  SERVICES_CSV: 'api-gateway,patient-service,history-service,assessment-service'
+  SERVICES: '["api-gateway","patient-service","history-service","assessment-service"]'
 
 on:
   pull_request:
@@ -19,11 +19,19 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      changed: ${{ steps.set-outputs.outputs.changed }}
-      build_all: ${{ steps.set-outputs.outputs.build_all }}
-      any: ${{ steps.set-outputs.outputs.any }}
+      services: ${{ steps.set-matrix.outputs.services }}
+      any: ${{ steps.set-matrix.outputs.any }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Installer jq
+        shell: bash
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y jq
+          fi
+
       - name: Détecter les changements
         id: filter
         uses: dorny/paths-filter@v3
@@ -41,57 +49,73 @@ jobs:
               - 'libs/**'
             root:
               - 'pom.xml'
-      - name: Préparer sorties
-        id: set-outputs
+
+      - name: Préparer matrice
+        id: set-matrix
         shell: bash
         run: |
-          changed=""
-          append() { if [ -z "$changed" ]; then changed="$1"; else changed="$changed,$1"; fi; }
+          # Normalise la liste complète des services en JSON compact
+          ALL_JSON=$(jq -c '.' <<< '${{ env.SERVICES }}')
 
-          [ "${{ steps.filter.outputs.api-gateway }}" = "true" ] && append "api-gateway"
-          [ "${{ steps.filter.outputs.patient-service }}" = "true" ] && append "patient-service"
-          [ "${{ steps.filter.outputs.history-service }}" = "true" ] && append "history-service"
-          [ "${{ steps.filter.outputs.assessment-service }}" = "true" ] && append "assessment-service"
-
-          # Build complet sur push main ou si libs/pom changent
-          if [ "${{ github.event_name }}" = "push" ] || [ "${{ steps.filter.outputs.libs }}" = "true" ] || [ "${{ steps.filter.outputs.root }}" = "true" ]; then
-            echo "build_all=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "build_all=false" >> "$GITHUB_OUTPUT"
+          # Push sur main: on build tout
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "services=$ALL_JSON" >> "$GITHUB_OUTPUT"
+            echo 'any=true' >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-          if [ -n "$changed" ] || [ "${{ github.event_name }}" = "push" ] || [ "${{ steps.filter.outputs.libs }}" = "true" ] || [ "${{ steps.filter.outputs.root }}" = "true" ]; then
-            echo "any=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "any=false" >> "$GITHUB_OUTPUT"
-          fi
+          # Construire la liste des services modifiés en JSON
+          changed_json=$(jq -cn \
+            --arg ag "${{ steps.filter.outputs.api-gateway }}" \
+            --arg ps "${{ steps.filter.outputs.patient-service }}" \
+            --arg hs "${{ steps.filter.outputs.history-service }}" \
+            --arg as "${{ steps.filter.outputs.assessment-service }}" '
+              [ ["api-gateway", $ag],
+                ["patient-service", $ps],
+                ["history-service", $hs],
+                ["assessment-service", $as] ]
+              | map(select(.[1]=="true")) | map(.[0]) ')
 
-          echo "changed=${changed}" >> "$GITHUB_OUTPUT"
+          # Si aucun service ciblé mais libs/root ont changé: tout builder
+          if [ "$(jq -r 'length' <<<"$changed_json")" -eq 0 ]; then
+            if [ "${{ steps.filter.outputs.libs }}" = "true" ] || [ "${{ steps.filter.outputs.root }}" = "true" ]; then
+              echo "services=$ALL_JSON" >> "$GITHUB_OUTPUT"
+              echo 'any=true' >> "$GITHUB_OUTPUT"
+            else
+              echo 'services=[]' >> "$GITHUB_OUTPUT"
+              echo 'any=false' >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "services=$changed_json" >> "$GITHUB_OUTPUT"
+            echo 'any=true' >> "$GITHUB_OUTPUT"
+          fi
 
   build-test:
     runs-on: ubuntu-latest
     needs: changes
-    # Une seule condition: au moins un module à construire, et ne lancer ce job
-    # que pour les services modifiés (ou tous si build_all=true).
-    if: needs.changes.outputs.any == 'true' && (needs.changes.outputs.build_all == 'true' || contains(format(',{0},', needs.changes.outputs.changed), format(',{0},', matrix.service)))
+    if: needs.changes.outputs.any == 'true'
     strategy:
       fail-fast: false
       matrix:
-        service: [ api-gateway, patient-service, history-service, assessment-service ]
+        service: ${{ fromJSON(needs.changes.outputs.services) }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Temurin 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'maven'
+
       - name: Afficher modules sélectionnés
         run: |
-          echo "Services modifiés: ${{ needs.changes.outputs.changed }}"
+          echo "Services sélectionnés: ${{ needs.changes.outputs.services }}"
           echo "Service courant: ${{ matrix.service }}"
+
       - name: Rendre le wrapper Maven exécutable
         run: chmod +x ./mvnw
+
       - name: Build (sélectif)
         shell: bash
         run: |
@@ -99,6 +123,7 @@ jobs:
           echo "Construction Maven du module: $MOD"
           set -o pipefail
           ./mvnw -B -e -T1C --no-transfer-progress -DskipTests=true -pl "$MOD" -am clean package | tee "build-${MOD//\//-}.log"
+
       - name: Publier logs Maven si échec (par module)
         if: failure()
         uses: actions/upload-artifact@v4
