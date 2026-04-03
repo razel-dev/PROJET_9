@@ -48,20 +48,21 @@ jobs:
             echo 'any=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          changed=()
-          if [ "${{ steps.filter.outputs.api-gateway }}" = "true" ]; then
-            changed+=("\"api-gateway\"")
-          fi
-          if [ "${{ steps.filter.outputs.patient-service }}" = "true" ]; then
-            changed+=("\"patient-service\"")
-          fi
-          if [ "${{ steps.filter.outputs.history-service }}" = "true" ]; then
-            changed+=("\"history-service\"")
-          fi
-          if [ "${{ steps.filter.outputs.assessment-service }}" = "true" ]; then
-            changed+=("\"assessment-service\"")
-          fi
-          if [ ${#changed[@]} -eq 0 ]; then
+
+          # Construire en JSON robuste avec jq
+          changed_json=$(jq -cn \
+            --arg ag "${{ steps.filter.outputs.api-gateway }}" \
+            --arg ps "${{ steps.filter.outputs.patient-service }}" \
+            --arg hs "${{ steps.filter.outputs.history-service }}" \
+            --arg as "${{ steps.filter.outputs.assessment-service }}" '
+              [ ["api-gateway", $ag],
+                ["patient-service", $ps],
+                ["history-service", $hs],
+                ["assessment-service", $as] ]
+              | map(select(.[1]=="true")) | map(.[0]) ')
+
+          # Si aucun service ciblé mais libs/root ont changé, tout builder
+          if [ "$(jq -r 'length' <<<"$changed_json")" -eq 0 ]; then
             if [ "${{ steps.filter.outputs.libs }}" = "true" ] || [ "${{ steps.filter.outputs.root }}" = "true" ]; then
               echo "services=${{ env.SERVICES }}" >> "$GITHUB_OUTPUT"
               echo 'any=true' >> "$GITHUB_OUTPUT"
@@ -70,7 +71,7 @@ jobs:
               echo 'any=false' >> "$GITHUB_OUTPUT"
             fi
           else
-            printf 'services=[%s]\n' "$(IFS=,; echo "${changed[*]}")" >> "$GITHUB_OUTPUT"
+            echo "services=$changed_json" >> "$GITHUB_OUTPUT"
             echo 'any=true' >> "$GITHUB_OUTPUT"
           fi
   build-test:
