@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Détails patient</title>
+</head>
+<body>
+<section layout:fragment="content">
+    <h1 class="h3 mb-3">Détails du patient</h1>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3"><strong>ID</strong><div th:text="${patient.id}">1</div></div>
+                <div class="col-md-3"><strong>Nom</strong><div th:text="${patient.nom}">Doe</div></div>
+                <div class="col-md-3"><strong>Prénom</strong><div th:text="${patient.prenom}">John</div></div>
+                <div class="col-md-3"><strong>Naissance</strong><div th:text="${patient.dateDeNaissance}">1970-01-01</div></div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="h5">Notes</h2>
+    <div class="list-group mb-3" th:if="${#lists.isEmpty(notes)}">
+        <div class="list-group-item text-muted">Aucune note</div>
+    </div>
+    <div class="list-group mb-3" th:if="${!#lists.isEmpty(notes)}">
+        <div class="list-group-item" th:each="n : ${notes}">
+            <div class="d-flex justify-content-between">
+                <div th:text="${n.content}">Contenu…</div>
+                <small class="text-muted" th:text="${n.createdAt}">date</small>
+            </div>
+        </div>
+    </div>
+
+    <form class="card" th:action="@{|/patients/${patient.id}/notes|}" method="post">
+        <div class="card-body">
+            <label class="form-label">Ajouter une note</label>
+            <textarea class="form-control" name="content" rows="3" placeholder="Votre note…"></textarea>
+        </div>
+        <div class="card-footer text-end">
+            <button class="btn btn-primary" type="submit">Enregistrer</button>
+        </div>
+    </form>
+</section>
+</body>
+</html>

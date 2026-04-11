@@ -10,6 +10,11 @@
   <artifactId>patient-service</artifactId>
   <name>patient-service</name>
 
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+  </properties>
+
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -56,10 +61,13 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
+    <!-- SUPPRIMÉ: spring-boot-starter-oauth2-resource-server qui forçait un JwtDecoder -->
+    <!--
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
     </dependency>
+    -->
     <!-- Lombok -->
     <dependency>
       <groupId>org.projectlombok</groupId>
@@ -130,7 +138,14 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>false</filtering>
+      </resource>
+    </resources>
     <plugins>
       <!-- Spécifie la classe principale pour le repackage -->
       <plugin>
@@ -165,6 +180,21 @@
               <version>0.2.0</version>
             </path>
           </annotationProcessorPaths>
+        </configuration>
+      </plugin>
+      <!-- Forcer l'encodage UTF-8 pour le plugin resources -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.3.1</version>
+        <configuration>
+          <encoding>UTF-8</encoding>
+          <useDefaultDelimiters>true</useDefaultDelimiters>
+          <nonFilteredFileExtensions>
+            <nonFilteredFileExtension>properties</nonFilteredFileExtension>
+            <nonFilteredFileExtension>yml</nonFilteredFileExtension>
+            <nonFilteredFileExtension>yaml</nonFilteredFileExtension>
+          </nonFilteredFileExtensions>
         </configuration>
       </plugin>
     </plugins>
