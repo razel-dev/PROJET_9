@@ -12,25 +12,22 @@
     {
       "clientId": "front-app",
       "protocol": "openid-connect",
-      "publicClient": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "rpsc1bnFeoCmLDx6pxYTLba7v5Yc56M8",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
       "redirectUris": [
         "http://localhost:8082/*"
       ],
       "webOrigins": [
         "http://localhost:8082"
       ],
-      "standardFlowEnabled": true,
-      "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": false,
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "http://localhost:8082/*"
-      },
-      "access": {
-        "view": true,
-        "configure": true,
-        "manage": true
       }
     }
   ],

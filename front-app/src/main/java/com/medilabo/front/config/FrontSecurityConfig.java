@@ -5,6 +5,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
+
+
+
 @Configuration
 public class FrontSecurityConfig {
 
@@ -16,6 +19,7 @@ public class FrontSecurityConfig {
                 .requestMatchers(
                     "/",
                     "/login/**",
+                    "/oauth2/**",
                     "/actuator/**",
                     "/webjars/**",
                     "/css/**",
@@ -32,7 +36,6 @@ public class FrontSecurityConfig {
             .oauth2Login(oauth -> oauth
                 .defaultSuccessUrl("/", true)
             );
-
 
         return http.build();
     }

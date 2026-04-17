@@ -1,29 +1,99 @@
 ﻿name: medilabo
-x-healthcheck-timings: &healthcheck-timings
-  interval: 10s
-  timeout: 5s
-  retries: 30
-  start_period: 20s
-x-restart-policy: &restart-unless-stopped
-  restart: unless-stopped
-x-backend-network: &backend-network
-  networks: [ "backend" ]
-x-spring-docker-env: &spring-docker-env
-  SPRING_PROFILES_ACTIVE: docker
+
 services:
+  mysql:
+    image: mysql:8.3
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootroot}
+      MYSQL_DATABASE: medilabo_patients
+    command:
+      - --default-time-zone=+00:00
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p${MYSQL_ROOT_PASSWORD:-rootroot} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    networks:
+      - backend
+
+  mongo:
+    image: mongo:6
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --eval 'db.adminCommand(\"ping\")' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    networks:
+      - backend
+
+  patient-service:
+    build: ../../patient-service
+    image: patient-service:latest
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/medilabo_patients?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-root}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-rootroot}
+    restart: unless-stopped
+    networks:
+      - backend
+
+  history-service:
+    build: ../../history-service
+    image: history-service:latest
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8083
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/medilabo_history
+      SPRING_DATA_MONGODB_AUTO_INDEX_CREATION: "true"
+    restart: unless-stopped
+    networks:
+      - backend
+
+  assessment-service:
+    build: ../../assessment-service
+    image: assessment-service:latest
+    depends_on:
+      patient-service:
+        condition: service_started
+      history-service:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8085
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      APP_VERSION: ${APP_VERSION:-dev}
+    restart: unless-stopped
+    networks:
+      - backend
+
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
-    profiles: [ "auth" ]
-    command: [ "start-dev", "--http-port=8080", "--import-realm" ]
+    profiles: ["auth"]
+    command: ["start-dev", "--http-port=8080", "--import-realm"]
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_METRICS_ENABLED: "true"
-      KC_HOSTNAME_URL: http://keycloak:8080
+      KC_HOSTNAME_URL: http://localhost:8080
+      KC_HOSTNAME_ADMIN_URL: http://localhost:8080
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
-      KC_PROXY: passthrough
-
       KC_HTTP_COOKIE_SECURE: "false"
       KC_HTTP_COOKIE_SAMESITE: "Lax"
     ports:
@@ -31,127 +101,52 @@ services:
     volumes:
       - ../keycloak/medilabo-realm.json:/opt/keycloak/data/import/medilabo-realm.json:ro
       - keycloak-data:/opt/keycloak/data
-    <<: [ *backend-network, *restart-unless-stopped ]
-    healthcheck:
-      test: [ "CMD", "sh", "-lc", "exit 0" ]
-      <<: *healthcheck-timings
-  mongo:
-    image: mongo:6
-    volumes:
-      - mongo-data:/data/db
-    healthcheck:
-      test: [ "CMD-SHELL", "mongosh --eval 'db.adminCommand(\"ping\")' || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-    <<: *backend-network
-  assessment-service:
-    build:
-      context: ../../assessment-service
-      dockerfile: Dockerfile
-    image: assessment-service:latest
-    profiles: [ "assessment" ]
-    environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
-      ENVIRONMENT: ${ENVIRONMENT:-local}
-      APP_VERSION: ${APP_VERSION:-dev}
-    <<: [ *backend-network, *restart-unless-stopped ]
-    healthcheck:
-      test: [ "CMD", "sh", "-lc", "exit 0" ]
-      <<: *healthcheck-timings
+    restart: unless-stopped
+    networks:
+      - backend
+
   api-gateway:
-    build:
-      context: ../../api-gateway
+    build: ../../api-gateway
     image: api-gateway:latest
-    profiles: [ "auth" ]
+    profiles: ["auth"]
     depends_on:
       keycloak:
         condition: service_started
       patient-service:
-        condition: service_healthy
+        condition: service_started
       history-service:
-        condition: service_healthy
+        condition: service_started
     environment:
-      <<: *spring-docker-env
-
+      SPRING_PROFILES_ACTIVE: docker
     ports:
       - "18081:8080"
-    <<: [ *backend-network, *restart-unless-stopped ]
-    healthcheck:
-      test: [ "CMD", "sh", "-lc", "exit 0" ]
-      <<: *healthcheck-timings
+    restart: unless-stopped
+    networks:
+      - backend
+
   front-app:
-    build:
-      context: ../../front-app
-      dockerfile: Dockerfile
+    build: ../../front-app
     image: front-app:latest
+    profiles: ["auth"]
     depends_on:
       keycloak:
         condition: service_started
       api-gateway:
         condition: service_started
     environment:
-      <<: *spring-docker-env
+      SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 8082
-      KEYCLOAK_FRONT_CLIENT_SECRET: ${KEYCLOAK_FRONT_CLIENT_SECRET}
+      KEYCLOAK_CLIENT_SECRET: "rpsc1bnFeoCmLDx6pxYTLba7v5Yc56M8"
     ports:
       - "8082:8082"
-    <<: [ *backend-network, *restart-unless-stopped ]
-    healthcheck:
-      test: [ "CMD", "sh", "-lc", "exit 0" ]
-      <<: *healthcheck-timings
-  patient-service:
-    build:
-      context: ../../patient-service
-      dockerfile: Dockerfile
-    image: patient-service:latest
-    depends_on:
-      mysql:
-        condition: service_healthy
-    environment:
-      <<: *spring-docker-env
-      SERVER_PORT: 8084
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/medilabo_patients?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-root}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-rootroot}
-    <<: [ *backend-network, *restart-unless-stopped ]
-    healthcheck:
-      test: [ "CMD", "sh", "-lc", "exit 0" ]
-      <<: *healthcheck-timings
-  history-service:
-    build:
-      context: ../../history-service
-    image: history-service:latest
-    depends_on:
-      mongo:
-        condition: service_healthy
-    environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
-      SERVER_PORT: 8083
-      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/medilabo_history
-      SPRING_DATA_MONGODB_AUTO_INDEX_CREATION: "true"
-    <<: [ *backend-network, *restart-unless-stopped ]
-    healthcheck:
-      test: [ "CMD", "sh", "-lc", "exit 0" ]
-      <<: *healthcheck-timings
-  mysql:
-    image: mysql:8.3
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootroot}
-      MYSQL_DATABASE: medilabo_patients
-      # Pas besoin de MYSQL_USER/PASSWORD si vous utilisez root pour le service
-    command: [ "--default-time-zone=+00:00", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci" ]
-    volumes:
-      - mysql-data:/var/lib/mysql
-    healthcheck:
-      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -p${MYSQL_ROOT_PASSWORD:-rootroot} || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-    <<: *backend-network
+    restart: unless-stopped
+    networks:
+      - backend
+
 networks:
-  backend: { }
+  backend:
+
 volumes:
-  mongo-data: { }
-  mysql-data: { }
-  keycloak-data: { }
+  mysql-data:
+  mongo-data:
+  keycloak-data:
