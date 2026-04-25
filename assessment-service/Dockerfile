@@ -1,18 +1,17 @@
-# syntax=docker/dockerfile:1.7
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+WORKDIR /workspace
+
+COPY . .
+RUN mvn -q -DskipTests -pl assessment-service -am package spring-boot:repackage \
+ && JAR="$(find assessment-service/target -maxdepth 1 -type f -name '*.jar' ! -name '*plain.jar' | head -n1)" \
+ && cp "$JAR" /workspace/app.jar
+
 FROM eclipse-temurin:17-jre
-
-# Options JVM adaptées aux containers
-ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=50"
-
-# Répertoire d'exécution
 WORKDIR /app
 
-# Copie le JAR Spring Boot repackage (généré par maven package)
-ARG JAR_FILE=target/*.jar
-COPY ${JAR_FILE} app.jar
+COPY --from=build /workspace/app.jar /app/app.jar
 
-# Sécurité: exécuter en non-root
 USER 1000
+EXPOSE 8085
 
-EXPOSE 8080
-ENTRYPOINT ["java","-jar","/app/app.jar"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
