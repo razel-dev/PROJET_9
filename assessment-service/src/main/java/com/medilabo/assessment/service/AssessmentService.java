@@ -2,8 +2,8 @@ package com.medilabo.assessment.service;
 
 import com.medilabo.assessment.client.HistoryClient;
 import com.medilabo.assessment.client.PatientClient;
-import com.medilabo.assessment.client.PatientDto;
-import com.medilabo.assessment.core.TriggerTerms;
+import com.medilabo.assessment.client.dto.PatientDto;
+import com.medilabo.assessment.util.TriggerTerms;
 import com.medilabo.assessment.dto.AssessmentDto;
 import com.medilabo.assessment.model.RiskLevel;
 import lombok.RequiredArgsConstructor;
