@@ -1,127 +1,144 @@
-name: CI Mono-Repo
-env:
-  SERVICES: '["api-gateway","patient-service","history-service","assessment-service"]'
+name: CI
 
 on:
   pull_request:
     paths:
-      - 'api-gateway/**'
-      - 'patient-service/**'
-      - 'history-service/**'
-      - 'assessment-service/**'
-      - 'libs/**'
-      - 'pom.xml'
-      - '.github/workflows/**'
+      - "api-gateway/**"
+      - "patient-service/**"
+      - "history-service/**"
+      - "assessment-service/**"
+      - "front-app/**"
+      - "libs/**"
+      - "pom.xml"
+      - ".github/workflows/**"
+      - "platform/compose/**"
   push:
     branches: [ main ]
+    paths:
+      - "api-gateway/**"
+      - "patient-service/**"
+      - "history-service/**"
+      - "assessment-service/**"
+      - "front-app/**"
+      - "libs/**"
+      - "pom.xml"
+      - ".github/workflows/**"
+      - "platform/compose/**"
+  workflow_dispatch:
 
 jobs:
-  changes:
+  detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      changed: ${{ steps.set-outputs.outputs.changed }}
-      build_all: ${{ steps.set-outputs.outputs.build_all }}
-      any: ${{ steps.set-outputs.outputs.any }}
+      modules: ${{ steps.modules.outputs.modules }}
+      docker_services: ${{ steps.modules.outputs.docker_services }}
+      has_changes: ${{ steps.modules.outputs.has_changes }}
+      compose_changed: ${{ steps.filter.outputs.compose }}
     steps:
       - uses: actions/checkout@v4
-      - name: Détecter les changements
+
+      - name: Detect changed paths
         id: filter
         uses: dorny/paths-filter@v3
         with:
           filters: |
             api-gateway:
-              - 'api-gateway/**'
+              - "api-gateway/**"
             patient-service:
-              - 'patient-service/**'
+              - "patient-service/**"
             history-service:
-              - 'history-service/**'
+              - "history-service/**"
             assessment-service:
-              - 'assessment-service/**'
+              - "assessment-service/**"
+            front-app:
+              - "front-app/**"
             libs:
-              - 'libs/**'
+              - "libs/**"
             root:
-              - 'pom.xml'
-      - name: Préparer sorties
-        id: set-outputs
+              - "pom.xml"
+            compose:
+              - "platform/compose/**"
+
+      - name: Build dynamic matrices
+        id: modules
         shell: bash
         run: |
-          changed=""
-          append() { if [ -z "$changed" ]; then changed="$1"; else changed="$changed,$1"; fi; }
+          modules=()
+          docker_services=()
 
-          [ "${{ steps.filter.outputs.api-gateway }}" = "true" ] && append "api-gateway"
-          [ "${{ steps.filter.outputs.patient-service }}" = "true" ] && append "patient-service"
-          [ "${{ steps.filter.outputs.history-service }}" = "true" ] && append "history-service"
-          [ "${{ steps.filter.outputs.assessment-service }}" = "true" ] && append "assessment-service"
+          add_module() {
+            modules+=("\"$1\"")
+          }
 
-          # Build complet sur push main ou si libs/pom changent
-          if [ "${{ github.event_name }}" = "push" ] || [ "${{ steps.filter.outputs.libs }}" = "true" ] || [ "${{ steps.filter.outputs.root }}" = "true" ]; then
-            echo "build_all=true" >> "$GITHUB_OUTPUT"
+          add_docker() {
+            docker_services+=("\"$1\"")
+          }
+
+          if [[ "${{ steps.filter.outputs.libs }}" == "true" || "${{ steps.filter.outputs.root }}" == "true" ]]; then
+            modules=("\"api-gateway\"" "\"patient-service\"" "\"history-service\"" "\"assessment-service\"" "\"front-app\"")
+            docker_services=("\"api-gateway\"" "\"patient-service\"" "\"history-service\"" "\"assessment-service\"" "\"front-app\"")
           else
-            echo "build_all=false" >> "$GITHUB_OUTPUT"
+            [[ "${{ steps.filter.outputs.api-gateway }}" == "true" ]] && add_module "api-gateway" && add_docker "api-gateway"
+            [[ "${{ steps.filter.outputs.patient-service }}" == "true" ]] && add_module "patient-service" && add_docker "patient-service"
+            [[ "${{ steps.filter.outputs.history-service }}" == "true" ]] && add_module "history-service" && add_docker "history-service"
+            [[ "${{ steps.filter.outputs.assessment-service }}" == "true" ]] && add_module "assessment-service" && add_docker "assessment-service"
+            [[ "${{ steps.filter.outputs.front-app }}" == "true" ]] && add_module "front-app" && add_docker "front-app"
           fi
 
-          if [ -n "$changed" ] || [ "${{ github.event_name }}" = "push" ] || [ "${{ steps.filter.outputs.libs }}" = "true" ] || [ "${{ steps.filter.outputs.root }}" = "true" ]; then
-            echo "any=true" >> "$GITHUB_OUTPUT"
+          if [[ ${#modules[@]} -eq 0 && "${{ steps.filter.outputs.compose }}" != "true" ]]; then
+            echo 'has_changes=false' >> "$GITHUB_OUTPUT"
+            echo 'modules=[]' >> "$GITHUB_OUTPUT"
+            echo 'docker_services=[]' >> "$GITHUB_OUTPUT"
           else
-            echo "any=false" >> "$GITHUB_OUTPUT"
+            echo 'has_changes=true' >> "$GITHUB_OUTPUT"
+            echo "modules=[$(IFS=,; echo "${modules[*]}")]" >> "$GITHUB_OUTPUT"
+            echo "docker_services=[$(IFS=,; echo "${docker_services[*]}")]" >> "$GITHUB_OUTPUT"
           fi
 
-          echo "changed=${changed}" >> "$GITHUB_OUTPUT"
-
-  build-test:
+  verify-java:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true' && needs.detect-changes.outputs.modules != '[]'
     runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.any == 'true'
     strategy:
       fail-fast: false
       matrix:
-        service: [ api-gateway, patient-service, history-service, assessment-service ]
+        module: ${{ fromJson(needs.detect-changes.outputs.modules) }}
     steps:
       - uses: actions/checkout@v4
-      - name: Décider si ce module doit être construit
-        id: decide
-        run: |
-          CHANGED_CSV="${{ needs.changes.outputs.changed }}"
-          BUILD_ALL="${{ needs.changes.outputs.build_all }}"
-          SERVICE="${{ matrix.service }}"
-          if [ "$BUILD_ALL" = "true" ]; then
-            echo "SELECTED=true" >> "$GITHUB_ENV"
-          else
-            # contains() YAML peut matcher des sous-chaînes; on borne par des virgules côté bash
-            CSV=",$CHANGED_CSV,"
-            if [[ "$CSV" == *,"$SERVICE",* ]]; then
-              echo "SELECTED=true" >> "$GITHUB_ENV"
-            else
-              echo "SELECTED=false" >> "$GITHUB_ENV"
-            fi
-          fi
-      - name: Setup Temurin 17
-        if: env.SELECTED == 'true'
+
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'maven'
-      - name: Afficher modules sélectionnés
-        if: env.SELECTED == 'true'
-        run: |
-          echo "Services modifiés: ${{ needs.changes.outputs.changed }}"
-          echo "Service courant: ${{ matrix.service }}"
-      - name: Rendre le wrapper Maven exécutable
-        if: env.SELECTED == 'true'
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Make Maven wrapper executable
         run: chmod +x ./mvnw
-      - name: Build (sélectif)
-        if: env.SELECTED == 'true'
-        shell: bash
-        run: |
-          MOD="${{ matrix.service }}"
-          echo "Construction Maven du module: $MOD"
-          set -o pipefail
-          ./mvnw -B -e -T1C --no-transfer-progress -DskipTests=true -pl "$MOD" -am clean package | tee "build-${MOD//\//-}.log"
-      - name: Publier logs Maven si échec (par module)
-        if: env.SELECTED == 'true' && failure()
-        uses: actions/upload-artifact@v4
+
+      - name: Verify changed module
+        run: ./mvnw -B -ntp -T1C -pl ${{ matrix.module }} -am verify
+
+  build-docker:
+    needs: [detect-changes, verify-java]
+    if: github.event_name != 'pull_request' && needs.detect-changes.outputs.docker_services != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.docker_services) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
         with:
-          name: maven-logs-${{ matrix.service }}
-          path: build-*.log
-          if-no-files-found: ignore
+          context: .
+          file: ./${{ matrix.service }}/Dockerfile
+          push: false
+          tags: ${{ matrix.service }}:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
