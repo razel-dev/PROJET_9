@@ -7,9 +7,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.medilabo.assessment.client.HistoryClient;
-import com.medilabo.assessment.client.NoteDto;
+import com.medilabo.assessment.client.dto.NoteDto;
 import com.medilabo.assessment.client.PatientClient;
-import com.medilabo.assessment.client.PatientDto;
+import com.medilabo.assessment.client.dto.PatientDto;
 import com.medilabo.assessment.dto.AssessmentDto;
 import org.junit.jupiter.api.Test;
 import java.time.Instant;
