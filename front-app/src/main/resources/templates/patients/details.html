@@ -1,48 +1,133 @@
 <!doctype html>
 <html lang="fr"
       xmlns:th="http://www.thymeleaf.org"
-      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      xmlns:layout="https://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
     <title>Détails patient</title>
 </head>
 <body>
 <section layout:fragment="content">
-    <h1 class="h3 mb-3">Détails du patient</h1>
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h1 class="h2 mb-1">
+                <span th:text="${patient.prenom}">John</span>
+                <span th:text="${patient.nom}">Doe</span>
+            </h1>
+            <p class="text-muted mb-0">Fiche patient, notes et évaluation du risque.</p>
+        </div>
+    </div>
 
-    <div class="card mb-4">
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-3"><strong>ID</strong><div th:text="${patient.id}">1</div></div>
-                <div class="col-md-3"><strong>Nom</strong><div th:text="${patient.nom}">Doe</div></div>
-                <div class="col-md-3"><strong>Prénom</strong><div th:text="${patient.prenom}">John</div></div>
-                <div class="col-md-3"><strong>Naissance</strong><div th:text="${patient.dateDeNaissance}">1970-01-01</div></div>
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h2 class="h5 mb-0">Informations du patient</h2>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <div class="text-uppercase small text-muted fw-semibold">ID</div>
+                            <div class="fw-semibold" th:text="${patient.id}">1</div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="text-uppercase small text-muted fw-semibold">Genre</div>
+                            <div class="fw-semibold"
+                                 th:text="${patient.genre == null ? '-' : (patient.genre == 'M' ? 'Masculin' : (patient.genre == 'F' ? 'Féminin' : patient.genre))}">
+                                -
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="text-uppercase small text-muted fw-semibold">Date de naissance</div>
+                            <div class="fw-semibold" th:text="${patient.dateDeNaissance}">1970-01-01</div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="text-uppercase small text-muted fw-semibold">Téléphone</div>
+                            <div class="fw-semibold" th:text="${patient.numeroTelephone != null ? patient.numeroTelephone : '-'}">-</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="text-uppercase small text-muted fw-semibold">Adresse</div>
+                            <div class="fw-semibold" th:text="${patient.adressePostale != null ? patient.adressePostale : '-'}">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h2 class="h5 mb-0">Notes médicales</h2>
+                </div>
+                <div class="card-body">
+                    <div th:if="${#lists.isEmpty(notes)}" class="text-muted">
+                        Aucune note pour ce patient.
+                    </div>
+
+                    <div th:if="${!#lists.isEmpty(notes)}" class="vstack gap-3">
+                        <article class="border rounded-3 p-3 bg-light-subtle" th:each="n : ${notes}">
+                            <div class="d-flex justify-content-end mb-2">
+                                <small class="text-muted"
+                                       th:text="${n.createdAt != null ? #temporals.format(n.createdAt, 'dd/MM/yyyy HH:mm') : ''}">date</small>
+                            </div>
+                            <p class="mb-0" th:text="${n.content}">Contenu</p>
+                        </article>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h2 class="h5 mb-0">Évaluation du risque</h2>
+                </div>
+                <div class="card-body" th:if="${assessment != null}">
+                    <div class="mb-3">
+                        <span class="badge rounded-pill text-bg-secondary" th:if="${assessment.risk == 'NONE'}">Aucun risque</span>
+                        <span class="badge rounded-pill text-bg-info" th:if="${assessment.risk == 'BORDERLINE'}">Risque limité</span>
+                        <span class="badge rounded-pill text-bg-warning" th:if="${assessment.risk == 'IN_DANGER'}">En danger</span>
+                        <span class="badge rounded-pill text-bg-danger" th:if="${assessment.risk == 'EARLY_ONSET'}">Apparition précoce</span>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="text-uppercase small text-muted fw-semibold">Âge</div>
+                            <div class="fw-semibold" th:text="${assessment.age}">0</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-uppercase small text-muted fw-semibold">Déclencheurs</div>
+                            <div class="fw-semibold" th:text="${assessment.triggerCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body text-muted" th:if="${assessment == null}">
+                    Évaluation indisponible pour le moment.
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h2 class="h5 mb-0">Ajouter une note</h2>
+                </div>
+                <div class="card-body">
+                    <form th:action="@{|/patients/${patient.id}/notes|}" method="post" class="vstack gap-3">
+                        <div>
+                            <label for="content" class="form-label">Contenu</label>
+                            <textarea id="content"
+                                      name="content"
+                                      class="form-control"
+                                      rows="5"
+                                      placeholder="Votre note..."
+                                      required></textarea>
+                        </div>
+
+                        <div class="d-grid">
+                            <button class="btn btn-primary" type="submit">Enregistrer</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-
-    <h2 class="h5">Notes</h2>
-    <div class="list-group mb-3" th:if="${#lists.isEmpty(notes)}">
-        <div class="list-group-item text-muted">Aucune note</div>
-    </div>
-    <div class="list-group mb-3" th:if="${!#lists.isEmpty(notes)}">
-        <div class="list-group-item" th:each="n : ${notes}">
-            <div class="d-flex justify-content-between">
-                <div th:text="${n.content}">Contenu…</div>
-                <small class="text-muted" th:text="${n.createdAt}">date</small>
-            </div>
-        </div>
-    </div>
-
-    <form class="card" th:action="@{|/patients/${patient.id}/notes|}" method="post">
-        <div class="card-body">
-            <label class="form-label">Ajouter une note</label>
-            <textarea class="form-control" name="content" rows="3" placeholder="Votre note…"></textarea>
-        </div>
-        <div class="card-footer text-end">
-            <button class="btn btn-primary" type="submit">Enregistrer</button>
-        </div>
-    </form>
 </section>
 </body>
 </html>

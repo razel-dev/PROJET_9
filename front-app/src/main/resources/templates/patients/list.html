@@ -8,7 +8,10 @@
 </head>
 <body>
 <section layout:fragment="content">
-    <h1 class="h3 mb-3">Patients</h1>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0">Patients</h1>
+        <a class="btn btn-primary" th:href="@{/patients/new}">Nouveau patient</a>
+    </div>
 
     <div class="card">
         <div class="table-responsive">
@@ -17,7 +20,7 @@
                 <tr>
                     <th>#</th>
                     <th>Nom</th>
-                    <th>Prénom</th>
+                    <th>Prenom</th>
                     <th>Date de naissance</th>
                     <th></th>
                 </tr>
@@ -29,8 +32,7 @@
                     <td th:text="${p.prenom}">John</td>
                     <td th:text="${p.dateDeNaissance}">1970-01-01</td>
                     <td class="text-end">
-                        <a class="btn btn-sm btn-primary"
-                           th:href="@{|/patients/${p.id}|}">
+                        <a class="btn btn-sm btn-primary" th:href="@{|/patients/${p.id}|}">
                             Ouvrir
                         </a>
                     </td>
