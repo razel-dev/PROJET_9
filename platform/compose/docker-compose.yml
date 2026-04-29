@@ -35,7 +35,9 @@ services:
       - backend
 
   patient-service:
-    build: ../../patient-service
+    build:
+      context: ../..
+      dockerfile: patient-service/Dockerfile
     image: patient-service:latest
     depends_on:
       mysql:
@@ -51,7 +53,9 @@ services:
       - backend
 
   history-service:
-    build: ../../history-service
+    build:
+      context: ../..
+      dockerfile: history-service/Dockerfile
     image: history-service:latest
     depends_on:
       mongo:
@@ -66,7 +70,9 @@ services:
       - backend
 
   assessment-service:
-    build: ../../assessment-service
+    build:
+      context: ../..
+      dockerfile: assessment-service/Dockerfile
     image: assessment-service:latest
     depends_on:
       patient-service:
@@ -87,8 +93,8 @@ services:
     profiles: ["auth"]
     command: ["start-dev", "--http-port=8080", "--import-realm"]
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_METRICS_ENABLED: "true"
       KC_HOSTNAME_URL: http://localhost:8080
       KC_HOSTNAME_ADMIN_URL: http://localhost:8080
@@ -106,7 +112,9 @@ services:
       - backend
 
   api-gateway:
-    build: ../../api-gateway
+    build:
+      context: ../..
+      dockerfile: api-gateway/Dockerfile
     image: api-gateway:latest
     profiles: ["auth"]
     depends_on:
@@ -115,6 +123,8 @@ services:
       patient-service:
         condition: service_started
       history-service:
+        condition: service_started
+      assessment-service:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: docker
@@ -125,7 +135,9 @@ services:
       - backend
 
   front-app:
-    build: ../../front-app
+    build:
+      context: ../..
+      dockerfile: front-app/Dockerfile
     image: front-app:latest
     profiles: ["auth"]
     depends_on:
@@ -136,7 +148,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 8082
-      KEYCLOAK_CLIENT_SECRET: "rpsc1bnFeoCmLDx6pxYTLba7v5Yc56M8"
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
     ports:
       - "8082:8082"
     restart: unless-stopped

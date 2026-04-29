@@ -2,7 +2,7 @@ FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /workspace
 
 COPY . .
-RUN mvn -q -DskipTests -pl assessment-service -am package spring-boot:repackage \
+RUN mvn -q -f /workspace/pom.xml -DskipTests -pl assessment-service -am package spring-boot:repackage \
  && JAR="$(find assessment-service/target -maxdepth 1 -type f -name '*.jar' ! -name '*plain.jar' | head -n1)" \
  && cp "$JAR" /workspace/app.jar
 
