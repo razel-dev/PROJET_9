@@ -21,13 +21,9 @@ public class FrontSecurityConfig {
                     "/login/**",
                     "/oauth2/**",
                     "/actuator/**",
-                    "/webjars/**",
                     "/css/**",
                     "/js/**",
                     "/images/**",
-                    "/fonts/**",
-                    "/webfonts/**",
-                    "/assets/**",
                     "/favicon.ico",
                     "/error"
                 ).permitAll()
@@ -35,6 +31,9 @@ public class FrontSecurityConfig {
             )
             .oauth2Login(oauth -> oauth
                 .defaultSuccessUrl("/", true)
+            )
+            .logout(logout -> logout
+                .logoutSuccessUrl("/login")
             );
 
         return http.build();
