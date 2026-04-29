@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="https://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Nouveau patient</title>
+</head>
+<body>
+<section layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Nouveau patient</h1>
+            <p class="text-muted mb-0">Creation rapide d'un dossier patient.</p>
+        </div>
+        <a class="btn btn-outline-secondary" th:href="@{/patients}">Retour a la liste</a>
+    </div>
+
+    <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}">
+        Une erreur est survenue.
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <form th:action="@{/patients}" method="post" class="row g-3">
+                <div class="col-md-6">
+                    <label for="prenom" class="form-label">Prenom</label>
+                    <input id="prenom" name="prenom" type="text" class="form-control" th:value="${prenom}" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="nom" class="form-label">Nom</label>
+                    <input id="nom" name="nom" type="text" class="form-control" th:value="${nom}" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="dateDeNaissance" class="form-label">Date de naissance</label>
+                    <input id="dateDeNaissance" name="dateDeNaissance" type="date" class="form-control" th:value="${dateDeNaissance}" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="genre" class="form-label">Genre</label>
+                    <select id="genre" name="genre" class="form-select" required>
+                        <option value="" th:selected="${genre == null or genre.isBlank()}" disabled>Choisir</option>
+                        <option value="M" th:selected="${genre == 'M'}">Masculin</option>
+                        <option value="F" th:selected="${genre == 'F'}">Feminin</option>
+                        <option value="OTHER" th:selected="${genre == 'OTHER'}">Autre</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="numeroTelephone" class="form-label">Telephone</label>
+                    <input id="numeroTelephone" name="numeroTelephone" type="text" class="form-control" th:value="${numeroTelephone}">
+                </div>
+                <div class="col-12">
+                    <label for="adressePostale" class="form-label">Adresse</label>
+                    <input id="adressePostale" name="adressePostale" type="text" class="form-control" th:value="${adressePostale}">
+                </div>
+                <div class="col-12 d-flex gap-2 justify-content-end">
+                    <a class="btn btn-outline-secondary" th:href="@{/patients}">Annuler</a>
+                    <button type="submit" class="btn btn-primary">Creer le patient</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+</body>
+</html>
