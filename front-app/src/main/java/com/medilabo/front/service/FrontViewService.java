@@ -23,7 +23,7 @@ import java.util.List;
  *
  * Tolérance aux pannes:
  * - list/get patient: retourne liste vide ou null en cas d'échec/404,
- * - notes: retourne liste vide en cas d'échec/404,
+ * - note: retourne liste vide en cas d'échec/404,
  * - assessment: retourne null en cas d'échec/404,
  * - create patient / add note: lève IllegalStateException avec message utilisateur.
  */
