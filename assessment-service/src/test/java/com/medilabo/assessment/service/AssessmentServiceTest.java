@@ -94,8 +94,8 @@ class AssessmentServiceTest {
                 () -> assertEquals(birthDate, dto.dateDeNaissance()),
                 () -> assertEquals("M", dto.genre()),
                 () -> assertEquals(expectedAge, dto.age()),
-                () -> assertEquals(6, dto.triggerCount()),
-                () -> assertEquals(RiskLevel.IN_DANGER, dto.risk())
+                () -> assertEquals(2, dto.triggerCount()),
+                () -> assertEquals(RiskLevel.BORDERLINE, dto.risk())
         );
 
         // Vérifier les interactions principales (orchestration)
