@@ -1,5 +1,6 @@
 # VCS / IDE
 .git
+.github
 .gitignore
 .gitattributes
 .idea
@@ -10,25 +11,31 @@
 .nb-gradle
 .gradle
 
-# Builds/outputs
+# Builds / outputs
 target/
+**/target/
 build/
+**/build/
 out/
+coverage/
+reports/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Maven/Gradle auxiliaires
-.mvn/
-**/.mvn/
-**/build/
-
-# Front éventuel
+# Node / front tooling
 node_modules/
 dist/
 
-# Environnements & secrets (ne jamais envoyer dans un build lancé depuis la racine)
+# Tests non nécessaires au packaging Docker
+**/src/test/
+
+# Compose / infra non utiles au build applicatif
+platform/compose/
+platform/keycloak/
+
+# Secrets / env
 *.env
 *.env.local
 **/*.env
@@ -44,3 +51,6 @@ dist/
 **/*.log
 logs/
 tmp/
+
+# Docs optionnelles
+*.md
